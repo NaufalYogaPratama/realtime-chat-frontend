@@ -2,45 +2,73 @@ import React, { useState, useEffect } from "react";
 import io from "socket.io-client";
 
 const socket = io("http://localhost:2121");
-socket.emit("register", "user1");
 
 function Chat() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
+  const [receiver, setReceiver] = useState("");
+  const userId = new URLSearchParams(window.location.search).get("user"); // Ambil ID dari URL
 
   useEffect(() => {
-    // Mendengarkan pesan baru dari server
-    socket.on("chatMessage", (msg) => {
-      setMessages((prevMessages) => [...prevMessages, msg]);
-    });
+    if (userId) {
+      socket.emit("register", userId);
 
-    // Clean up ketika komponen di-unmount
-    return () => {
-      socket.off("chatMessage");
-    };
-  }, []);
+      socket.on("privateMessage", (msg) => {
+        setMessages((prevMessages) => [...prevMessages, msg]);
+      });
+
+      return () => {
+        socket.off("privateMessage");
+      };
+    }
+  }, [userId]);
 
   const sendMessage = () => {
-    if (message.trim()) {
+    if (message.trim() && receiver.trim()) {
       const msgData = {
-        sender: "User1",
+        sender: userId,
+        receiver: receiver,
         message: message,
       };
 
-      // Mengirim pesan ke server
-      socket.emit("chatMessage", msgData);
+      socket.emit("privateMessage", msgData);
+      setMessages((prevMessages) => [...prevMessages, msgData]);
       setMessage("");
     }
   };
 
+  if (!userId) {
+    return <h1>Error: No User ID provided in the URL!</h1>;
+  }
+
   return (
     <div>
-      <h1>Real-Time Chat</h1>
+      <h1>Private Chat</h1>
+      <div>
+        <label>
+          <strong>Your ID: </strong>
+          <span>{userId}</span>
+        </label>
+      </div>
+      <div>
+        <label>
+          <strong>Send to (Receiver ID): </strong>
+          <input
+            type="text"
+            value={receiver}
+            onChange={(e) => setReceiver(e.target.value)}
+            placeholder="Masukkan ID penerima"
+          />
+        </label>
+      </div>
       <div>
         <ul>
           {messages.map((msg, index) => (
             <li key={index}>
-              <strong>{msg.sender}:</strong> {msg.message}
+              <strong>
+                {msg.sender} to {msg.receiver}:
+              </strong>{" "}
+              {msg.message}
             </li>
           ))}
         </ul>
